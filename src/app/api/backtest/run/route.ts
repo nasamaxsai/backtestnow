@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 
 interface Parameter {
   name: string;
@@ -21,6 +20,7 @@ interface BacktestRequest {
   strategyName: string;
 }
 
+// Generate all parameter combinations (up to maxCombinations)
 function generateCombinations(params: Parameter[], maxCombinations: number) {
   const enabledParams = params.filter((p) => p.enabled);
   const ranges = enabledParams.map((p) => {
@@ -51,6 +51,7 @@ function generateCombinations(params: Parameter[], maxCombinations: number) {
   return combinations;
 }
 
+// Simulate backtest for a given parameter set (deterministic mock)
 function simulateBacktest(combo: Record<string, number>, symbol: string, timeframe: string) {
   const seed = Object.values(combo).reduce((a, b) => a + b, 0);
   const rng = (offset = 0) => {
@@ -68,6 +69,9 @@ function simulateBacktest(combo: Record<string, number>, symbol: string, timefra
   const sharpe = totalReturn / volatility / Math.sqrt(252);
   const maxDrawdown = rng(6) * 25 + 5;
 
+  void symbol;
+  void timeframe;
+
   return {
     combo,
     trades,
@@ -82,23 +86,24 @@ function simulateBacktest(combo: Record<string, number>, symbol: string, timefra
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const body: BacktestRequest = await req.json();
-    const { params, symbol, timeframe, startDate, endDate, maxCombinations, strategyName, code } = body;
+    const { params, symbol, timeframe, startDate, endDate, maxCombinations, strategyName } = body;
 
     if (!params || params.length === 0) {
       return NextResponse.json({ error: "No parameters provided" }, { status: 400 });
     }
 
     const combinations = generateCombinations(params, maxCombinations);
-    const results = combinations.map((combo) => simulateBacktest(combo, symbol, timeframe));
+    const results = combinations.map((combo) =>
+      simulateBacktest(combo, symbol, timeframe)
+    );
+
     results.sort((a, b) => b.sharpe - a.sharpe);
 
-    const topResults = results.slice(0, 50).map((r, i) => ({ rank: i + 1, ...r }));
+    const topResults = results.slice(0, 50).map((r, i) => ({
+      rank: i + 1,
+      ...r,
+    }));
 
     const equityCurve = Array.from({ length: 100 }, (_, i) => ({
       day: i,

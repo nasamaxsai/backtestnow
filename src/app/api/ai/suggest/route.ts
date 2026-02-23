@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = auth();
-    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     const { code, symbol, timeframe } = await req.json();
 
     const openaiKey = process.env.OPENAI_API_KEY;
@@ -36,20 +32,21 @@ Respond in JSON format with an array of parameter suggestions.`,
       return NextResponse.json(result);
     }
 
+    // Smart fallback suggestions based on code analysis
     const suggestions = [];
     if (code.includes("rsiLength") || code.includes("RSI")) {
-      suggestions.push({ name: "rsiLength", min: 8, max: 21, step: 1, reason: "RSI period 8-21 is most effective in crypto markets" });
-      suggestions.push({ name: "rsiOverbought", min: 65, max: 80, step: 5, reason: "Overbought threshold recommended between 65-80" });
-      suggestions.push({ name: "rsiOversold", min: 20, max: 35, step: 5, reason: "Oversold threshold recommended between 20-35" });
+      suggestions.push({ name: "rsiLength", min: 8, max: 21, step: 1, reason: "RSI 週期 8-21 在加密貨幣市場最為有效" });
+      suggestions.push({ name: "rsiOverbought", min: 65, max: 80, step: 5, reason: "超買閾值建議在 65-80 之間測試" });
+      suggestions.push({ name: "rsiOversold", min: 20, max: 35, step: 5, reason: "超賣閾值建議在 20-35 之間測試" });
     }
     if (code.includes("emaPeriod") || code.includes("ema")) {
-      suggestions.push({ name: "emaPeriod", min: 100, max: 300, step: 50, reason: "EMA trend filter recommended 100-300 periods" });
+      suggestions.push({ name: "emaPeriod", min: 100, max: 300, step: 50, reason: "EMA 趨勢過濾器建議使用 100-300 週期" });
     }
     if (code.includes("stopLoss") || code.includes("stop")) {
-      suggestions.push({ name: "stopLossPct", min: 1.0, max: 5.0, step: 0.5, reason: "Stop loss recommended 1%-5%" });
+      suggestions.push({ name: "stopLossPct", min: 1.0, max: 5.0, step: 0.5, reason: "止損建議在 1%-5% 之間，避免過早止損" });
     }
     if (code.includes("takeProfit") || code.includes("limit")) {
-      suggestions.push({ name: "takeProfitPct", min: 2.0, max: 10.0, step: 1.0, reason: "Take profit recommended at least 2x stop loss" });
+      suggestions.push({ name: "takeProfitPct", min: 2.0, max: 10.0, step: 1.0, reason: "止盈建議至少為止損的 2 倍以上" });
     }
 
     return NextResponse.json({ suggestions });
