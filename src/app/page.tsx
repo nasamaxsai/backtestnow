@@ -43,7 +43,7 @@ const FEATURES = [
 
 const STEPS = [
   { num: "01", title: "上傳 PineScript", desc: "貼上您的策略代碼，系統自動擷取所有可調整參數。" },
-  { num: "02", title: "設定優化範圍", desc: "自訂每個參數的最小值、最大值與間距，或讓 AI 自動決定（1,000〜10,000 組合）。" },
+  { num: "02", title: "設定優化範圍", desc: "自訂每個參數的最小値、最大値與間距，或讓 AI 自動決定（1,000～10,000 組合）。" },
   { num: "03", title: "匯出最佳代碼", desc: "查看排行榜，選擇最佳參數組合，一鍵生成新的 PineScript 代碼。" },
 ];
 
@@ -77,7 +77,7 @@ function PriceTicker() {
       <div className="text-center mb-4">
         <h2 className="text-2xl font-bold text-white mb-1">支援資產報價</h2>
         <p className="text-slate-400 text-sm">
-          8 項可回測資產 · 加密貨幣即時更新 · 期貨延遲報價
+          8 項可回測資產 · 加密貨幣即時更新 · 期貨延遅報價
         </p>
       </div>
       <div className="ticker-wrapper bg-dark-800/50 border border-indigo-500/10 rounded-xl py-3">
@@ -107,7 +107,7 @@ function PriceTicker() {
         </div>
       </div>
       <p className="text-center text-slate-500 text-xs mt-2">
-        加密貨幣更新於 {time} · 每 60 秒自動刷新　＊ 期貨報價約有 15 分鐘延遲；收市後顯示前一交易日收盤價
+        加密貨幣更新於 {time} · 每 60 秒自動刷新　＊ 期貨報價約有1 5 分鐘延遲；收市後顯示前一交易日收盤價
       </p>
     </div>
   );
@@ -126,10 +126,10 @@ export default function HomePage() {
             <span className="font-bold text-white text-lg">BacktestNow</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/sign-in" className="text-slate-400 hover:text-white transition-colors text-sm font-medium">
+            <Link href="/dashboard" className="text-slate-400 hover:text-white transition-colors text-sm font-medium">
               登入
             </Link>
-            <Link href="/sign-up" className="btn-primary text-sm py-2 px-5">
+            <Link href="/dashboard" className="btn-primary text-sm py-2 px-5">
               免費開始
             </Link>
           </div>
@@ -148,14 +148,14 @@ export default function HomePage() {
             <span className="gradient-text">AI 強力驅動回測</span>
           </h1>
           <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            將您的 TradingView PineScript 策略優化至極致。運用自動化參數掃描與深度數據分析，
-            助您在多變市場中精準點擊，奪得交易先機。
+            將您的 TradingView PineScript 策略優化至極致。運用自動化參數揃描與深度數據分析，
+            助您在多變市場中精準點擊，婪得交易先機。
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/sign-up" className="btn-primary text-base py-3 px-8 flex items-center gap-2 justify-center">
+            <Link href="/dashboard" className="btn-primary text-base py-3 px-8 flex items-center gap-2 justify-center">
               立即啟動優化 <ArrowRight className="w-4 h-4" />
             </Link>
-            <Link href="/sign-in" className="btn-secondary text-base py-3 px-8 justify-center">
+            <Link href="/dashboard" className="btn-secondary text-base py-3 px-8 justify-center">
               登入
             </Link>
           </div>
@@ -214,8 +214,8 @@ export default function HomePage() {
           <div className="text-4xl mb-4">🚀</div>
           <h2 className="text-3xl font-bold text-white mb-4">立即開始免費優化</h2>
           <p className="text-slate-400 mb-8">無需信用卡，立即體驗 AI 策略優化引擎</p>
-          <Link href="/sign-up" className="btn-primary text-base py-3 px-10 inline-flex items-center gap-2">
-            免費建立帳號 <ArrowRight className="w-4 h-4" />
+          <Link href="/dashboard" className="btn-primary text-base py-3 px-10 inline-flex items-center gap-2">
+            免費進入平台 <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
