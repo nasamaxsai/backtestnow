@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import {
   BarChart3, Zap, History, Settings, PlusCircle,
@@ -59,7 +58,9 @@ export default function DashboardPage() {
 
         <div className="p-4 border-t border-indigo-500/10">
           <div className="flex items-center gap-3">
-            <UserButton afterSignOutUrl="/" />
+            <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+              <BarChart3 className="w-4 h-4 text-indigo-400" />
+            </div>
             <div className="text-sm">
               <p className="text-white font-medium">我的帳號</p>
               <p className="text-slate-500 text-xs">免費方案</p>
