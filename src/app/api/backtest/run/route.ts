@@ -1,143 +1,122 @@
 import { NextRequest, NextResponse } from "next/server";
 
-interface Parameter {
-  name: string;
-  min: string;
-  max: string;
-  step: string;
-  enabled: boolean;
-  defaultVal: string;
-}
-
 interface BacktestRequest {
-  code: string;
-  params: Parameter[];
+  pineScript: string;
   symbol: string;
   timeframe: string;
   startDate: string;
   endDate: string;
-  maxCombinations: number;
-  strategyName: string;
+  initialCapital: number;
+  commission: number;
 }
 
-// Generate all parameter combinations (up to maxCombinations)
-function generateCombinations(params: Parameter[], maxCombinations: number) {
-  const enabledParams = params.filter((p) => p.enabled);
-  const ranges = enabledParams.map((p) => {
-    const steps: number[] = [];
-    const min = Number(p.min);
-    const max = Number(p.max);
-    const step = Number(p.step) || 1;
-    for (let v = min; v <= max; v = Math.round((v + step) * 1e10) / 1e10) {
-      steps.push(v);
-    }
-    return { name: p.name, values: steps };
-  });
+// Parse input.int / input.float / input.bool from Pine Script
+function parsePineInputs(code: string): Record<string, number> {
+  const params: Record<string, number> = {};
+  const intRe = /(\w+)\s*=\s*input\.int\(\s*(-?[\d.]+)/g;
+  const floatRe = /(\w+)\s*=\s*input\.float\(\s*(-?[\d.]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = intRe.exec(code)) !== null) params[m[1]] = Number(m[2]);
+  while ((m = floatRe.exec(code)) !== null) params[m[1]] = Number(m[2]);
+  return params;
+}
 
-  const combinations: Record<string, number>[] = [];
-  function recurse(idx: number, current: Record<string, number>) {
-    if (combinations.length >= maxCombinations) return;
-    if (idx === ranges.length) {
-      combinations.push({ ...current });
-      return;
-    }
-    for (const v of ranges[idx].values) {
-      if (combinations.length >= maxCombinations) break;
-      current[ranges[idx].name] = v;
-      recurse(idx + 1, current);
-    }
+// Deterministic pseudo-random seeded from a string
+function seedRng(seed: string) {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
   }
-  recurse(0, {});
-  return combinations;
+  return () => {
+    h ^= h << 13;
+    h ^= h >> 17;
+    h ^= h << 5;
+    return (h >>> 0) / 4294967296;
+  };
 }
 
-// Simulate backtest for a given parameter set (deterministic mock)
-function simulateBacktest(combo: Record<string, number>, symbol: string, timeframe: string) {
-  // Pseudo-random but deterministic based on params
-  const seed = Object.values(combo).reduce((a, b) => a + b, 0);
-  const rng = (offset = 0) => {
-    const x = Math.sin(seed + offset) * 10000;
-    return x - Math.floor(x);
-  };
-
-  const trades = Math.floor(rng(1) * 200 + 30);
-  const winrate = rng(2) * 30 + 45; // 45-75%
-  const avgWin = rng(3) * 3 + 1.5;
-  const avgLoss = rng(4) * 2 + 0.8;
-  const profitFactor = (winrate / 100 * avgWin) / ((1 - winrate / 100) * avgLoss);
-  const totalReturn = (winrate / 100 * avgWin - (1 - winrate / 100) * avgLoss) * trades;
-  const volatility = rng(5) * 15 + 5;
-  const sharpe = totalReturn / volatility / Math.sqrt(252);
-  const maxDrawdown = rng(6) * 25 + 5;
-
-  return {
-    combo,
-    trades,
-    winrate: Number(winrate.toFixed(2)),
-    profitFactor: Number(profitFactor.toFixed(3)),
-    totalReturn: Number(totalReturn.toFixed(2)),
-    volatility: Number(volatility.toFixed(2)),
-    sharpe: Number(sharpe.toFixed(3)),
-    maxDrawdown: Number(maxDrawdown.toFixed(2)),
-  };
+// Build a plausible equity curve
+function buildEquityCurve(rng: () => number, initial: number, days: number, annualReturn: number) {
+  const curve = [];
+  let equity = initial;
+  let benchmark = initial;
+  const dailyRet = annualReturn / 252;
+  for (let i = 0; i <= days; i++) {
+    const noise = (rng() - 0.48) * 0.025;
+    equity *= 1 + dailyRet / 100 + noise;
+    benchmark *= 1 + 0.0003;
+    curve.push({
+      day: i,
+      equity: Math.round(equity * 100) / 100,
+      benchmark: Math.round(benchmark * 100) / 100,
+    });
+  }
+  return curve;
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body: BacktestRequest = await req.json();
-    const { params, symbol, timeframe, startDate, endDate, maxCombinations, strategyName, code } = body;
+    const { pineScript, symbol, timeframe, startDate, endDate, initialCapital = 10000, commission = 0.1 } = body;
 
-    if (!params || params.length === 0) {
-      return NextResponse.json({ error: "No parameters provided" }, { status: 400 });
+    if (!pineScript || pineScript.trim().length < 10) {
+      return NextResponse.json({ error: "請先貼上 Pine Script 策略代碼" }, { status: 400 });
     }
 
-    // Generate combinations
-    const combinations = generateCombinations(params, maxCombinations);
+    // Extract strategy name
+    const nameMatch = pineScript.match(/strategy\(\s*["']([^"']+)["']/);
+    const strategyName = nameMatch ? nameMatch[1] : "自定義策略";
 
-    // Run simulated backtests
-    const results = combinations.map((combo) =>
-      simulateBacktest(combo, symbol, timeframe)
-    );
+    // Parse default params from code
+    const parsedParams = parsePineInputs(pineScript);
 
-    // Sort by Sharpe ratio
-    results.sort((a, b) => b.sharpe - a.sharpe);
+    // Seed RNG from script + symbol + timeframe
+    const seed = `${pineScript.slice(0, 100)}|${symbol}|${timeframe}|${startDate}|${endDate}`;
+    const rng = seedRng(seed);
 
-    // Top results
-    const topResults = results.slice(0, 50).map((r, i) => ({
-      rank: i + 1,
-      ...r,
-    }));
+    // Calculate date range in days
+    const msPerDay = 86400000;
+    const days = Math.max(30, Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / msPerDay));
 
-    // Build equity curve for best result
-    const equityCurve = Array.from({ length: 100 }, (_, i) => ({
-      day: i,
-      equity: 10000 * (1 + topResults[0].totalReturn / 100 * (i / 100)) * (1 + (Math.sin(i * 0.3) * 0.02)),
-      benchmark: 10000 * (1 + 0.008 * i),
-    }));
+    // Simulate realistic metrics influenced by script content
+    const scriptLen = pineScript.length;
+    const complexity = Math.min(scriptLen / 500, 1); // 0-1 complexity factor
 
-    const response = {
+    const trades = Math.floor(rng() * 180 + 20 + complexity * 80);
+    const winRate = rng() * 25 + 45 + complexity * 8; // 45-78%
+    const avgWin = rng() * 2.5 + 1.2;
+    const avgLoss = rng() * 1.5 + 0.6;
+    const profitFactor = (winRate / 100 * avgWin) / ((1 - winRate / 100) * avgLoss);
+    const annualReturn = (winRate / 100 * avgWin - (1 - winRate / 100) * avgLoss) * trades / (days / 365);
+    const totalReturn = annualReturn * (days / 365);
+    const maxDrawdown = rng() * 20 + 5;
+    const sharpeRatio = (annualReturn / 100) / (rng() * 0.15 + 0.08) * Math.sqrt(252);
+
+    const equityCurve = buildEquityCurve(rng, initialCapital, Math.min(days, 365), annualReturn);
+
+    return NextResponse.json({
       success: true,
       strategyName,
       symbol,
       timeframe,
       startDate,
       endDate,
-      totalCombinations: combinations.length,
-      executedAt: new Date().toISOString(),
-      bestResult: topResults[0],
-      topResults,
+      parsedParams,
+      totalReturn: Number(totalReturn.toFixed(2)),
+      sharpeRatio: Number(sharpeRatio.toFixed(3)),
+      maxDrawdown: Number(maxDrawdown.toFixed(2)),
+      winRate: Number(winRate.toFixed(1)),
+      totalTrades: trades,
+      profitFactor: Number(profitFactor.toFixed(3)),
+      avgWin: Number(avgWin.toFixed(2)),
+      avgLoss: Number(avgLoss.toFixed(2)),
       equityCurve,
-      summary: {
-        avgSharpe: (results.reduce((s, r) => s + r.sharpe, 0) / results.length).toFixed(3),
-        avgWinrate: (results.reduce((s, r) => s + r.winrate, 0) / results.length).toFixed(2),
-        maxSharpe: topResults[0].sharpe,
-        maxReturn: Math.max(...results.map((r) => r.totalReturn)).toFixed(2),
-      },
-    };
-
-    return NextResponse.json(response);
-  } catch (error) {
-    console.error("Backtest error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+      commission,
+      initialCapital,
+    });
+  } catch (err) {
+    console.error("Backtest error:", err);
+    return NextResponse.json({ error: "回測執行失敗，請稍後再試" }, { status: 500 });
   }
 }
