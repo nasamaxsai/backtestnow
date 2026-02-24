@@ -53,6 +53,7 @@ function generateCombinations(params: Parameter[], maxCombinations: number) {
 
 // Simulate backtest for a given parameter set (deterministic mock)
 function simulateBacktest(combo: Record<string, number>, symbol: string, timeframe: string) {
+  // Pseudo-random but deterministic based on params
   const seed = Object.values(combo).reduce((a, b) => a + b, 0);
   const rng = (offset = 0) => {
     const x = Math.sin(seed + offset) * 10000;
@@ -60,7 +61,7 @@ function simulateBacktest(combo: Record<string, number>, symbol: string, timefra
   };
 
   const trades = Math.floor(rng(1) * 200 + 30);
-  const winrate = rng(2) * 30 + 45;
+  const winrate = rng(2) * 30 + 45; // 45-75%
   const avgWin = rng(3) * 3 + 1.5;
   const avgLoss = rng(4) * 2 + 0.8;
   const profitFactor = (winrate / 100 * avgWin) / ((1 - winrate / 100) * avgLoss);
@@ -68,9 +69,6 @@ function simulateBacktest(combo: Record<string, number>, symbol: string, timefra
   const volatility = rng(5) * 15 + 5;
   const sharpe = totalReturn / volatility / Math.sqrt(252);
   const maxDrawdown = rng(6) * 25 + 5;
-
-  void symbol;
-  void timeframe;
 
   return {
     combo,
@@ -87,24 +85,30 @@ function simulateBacktest(combo: Record<string, number>, symbol: string, timefra
 export async function POST(req: NextRequest) {
   try {
     const body: BacktestRequest = await req.json();
-    const { params, symbol, timeframe, startDate, endDate, maxCombinations, strategyName } = body;
+    const { params, symbol, timeframe, startDate, endDate, maxCombinations, strategyName, code } = body;
 
     if (!params || params.length === 0) {
       return NextResponse.json({ error: "No parameters provided" }, { status: 400 });
     }
 
+    // Generate combinations
     const combinations = generateCombinations(params, maxCombinations);
+
+    // Run simulated backtests
     const results = combinations.map((combo) =>
       simulateBacktest(combo, symbol, timeframe)
     );
 
+    // Sort by Sharpe ratio
     results.sort((a, b) => b.sharpe - a.sharpe);
 
+    // Top results
     const topResults = results.slice(0, 50).map((r, i) => ({
       rank: i + 1,
       ...r,
     }));
 
+    // Build equity curve for best result
     const equityCurve = Array.from({ length: 100 }, (_, i) => ({
       day: i,
       equity: 10000 * (1 + topResults[0].totalReturn / 100 * (i / 100)) * (1 + (Math.sin(i * 0.3) * 0.02)),
