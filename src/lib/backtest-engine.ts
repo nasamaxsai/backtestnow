@@ -405,7 +405,7 @@ export function runBacktest(
     sharpeRatio: Math.round(sharpe * 1000) / 1000,
     sortinoRatio: Math.round(sortino * 1000) / 1000,
     maxDrawdown: Math.round(maxDD * 100) / 100,
-    maxDrawdownDuration,
+    maxDrawdownDuration: maxDDDuration,
     winRate: Math.round(winRate * 10) / 10,
     totalTrades: trades.length,
     winningTrades: wins.length,
