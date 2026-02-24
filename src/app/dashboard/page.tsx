@@ -1,221 +1,403 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  BarChart3, Zap, History, Settings,
-  TrendingUp, Activity, Target,
-  LayoutDashboard, User, ChevronRight, Clock,
-  ArrowUpRight, ArrowDownRight
+  BarChart3, Zap, History, Settings, PlusCircle,
+  TrendingUp, TrendingDown, Activity, LayoutDashboard,
+  RefreshCw, ChevronRight
 } from "lucide-react";
+import OptimizePanel from "@/components/OptimizePanel";
+import ResultsPanel from "@/components/ResultsPanel";
 
-interface HistoryItem {
-  id: number;
-  name: string;
+const NAV_ITEMS = [
+  { icon: <LayoutDashboard className="w-5 h-5" />, label: "市場總覽", id: "market" },
+  { icon: <Zap className="w-5 h-5" />, label: "新增優化", id: "optimize" },
+  { icon: <History className="w-5 h-5" />, label: "歷史記錄", id: "history" },
+  { icon: <BarChart3 className="w-5 h-5" />, label: "績效分析", id: "analytics" },
+  { icon: <Settings className="w-5 h-5" />, label: "設定", id: "settings" },
+];
+
+const MOCK_HISTORY = [
+  { id: 1, name: "BTC RSI 策略", symbol: "BTC/USDT", timeframe: "4h", status: "completed", sharpe: 2.34, winrate: 67.3, profit: 142.5, date: "2026-02-20" },
+  { id: 2, name: "ETH 布林通道", symbol: "ETH/USDT", timeframe: "1h", status: "completed", sharpe: 1.87, winrate: 61.2, profit: 89.3, date: "2026-02-18" },
+  { id: 3, name: "SOL 突破策略", symbol: "SOL/USDT", timeframe: "15m", status: "running", sharpe: null, winrate: null, profit: null, date: "2026-02-23" },
+];
+
+type Asset = {
   symbol: string;
-  strategy: string;
-  returnPct: number;
-  winRate: number;
-  date: string;
-  status: "profit" | "loss";
-}
+  name: string;
+  price: number;
+  change: number;
+  type: string;
+};
 
-const MOCK_HISTORY: HistoryItem[] = [
-  { id: 1, name: "BTC 均線策略", symbol: "BTC/USDT", strategy: "MA Cross", returnPct: 23.4, winRate: 61, date: "2024-01-15", status: "profit" },
-  { id: 2, name: "ETH RSI 反轉", symbol: "ETH/USDT", strategy: "RSI", returnPct: -8.2, winRate: 44, date: "2024-01-10", status: "loss" },
-  { id: 3, name: "SOL 動能交易", symbol: "SOL/USDT", strategy: "Momentum", returnPct: 41.7, winRate: 68, date: "2024-01-05", status: "profit" },
-  { id: 4, name: "BTC 布林通道", symbol: "BTC/USDT", strategy: "Bollinger", returnPct: 12.1, winRate: 55, date: "2023-12-28", status: "profit" },
-  { id: 5, name: "ETH MACD 策略", symbol: "ETH/USDT", strategy: "MACD", returnPct: -3.5, winRate: 48, date: "2023-12-20", status: "loss" },
+const ASSETS_DEFAULT: Asset[] = [
+  { symbol: "BTC/USDT", name: "比特幣", price: 66353.14, change: -1.97, type: "crypto" },
+  { symbol: "ETH/USDT", name: "以太坊", price: 1929.38, change: -1.01, type: "crypto" },
+  { symbol: "SOL/USDT", name: "Solana", price: 80.93, change: -3.40, type: "crypto" },
+  { symbol: "BNB/USDT", name: "Binance Coin", price: 611.63, change: -1.14, type: "crypto" },
+  { symbol: "GC", name: "黃金期貨", price: 5173, change: 1.80, type: "futures" },
+  { symbol: "NQ", name: "納指期貨", price: 24930, change: -0.55, type: "futures" },
+  { symbol: "ES", name: "標普期貨", price: 6897, change: -0.39, type: "futures" },
+  { symbol: "SIL", name: "白銀期貨", price: 86, change: 4.71, type: "futures" },
 ];
 
-const MARKET_DATA = [
-  { symbol: "BTC/USDT", price: "67,234.50", change: "+2.34%", positive: true },
-  { symbol: "ETH/USDT", price: "3,521.80", change: "+1.87%", positive: true },
-  { symbol: "SOL/USDT", price: "182.40", change: "-0.92%", positive: false },
-  { symbol: "BNB/USDT", price: "412.30", change: "+0.54%", positive: true },
-];
+function MarketOverview() {
+  const [assets, setAssets] = useState<Asset[]>(ASSETS_DEFAULT);
+  const [updatedAt, setUpdatedAt] = useState("");
+  const [loading, setLoading] = useState(false);
 
-const STATS = [
-  { label: "總回測次數", value: "24", icon: BarChart3, color: "text-blue-400" },
-  { label: "平均報酬率", value: "+18.3%", icon: TrendingUp, color: "text-green-400" },
-  { label: "最佳策略勝率", value: "68%", icon: Target, color: "text-purple-400" },
-  { label: "本月回測", value: "7", icon: Activity, color: "text-yellow-400" },
-];
+  const fetchPrices = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/prices");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.prices) setAssets(data.prices);
+        setUpdatedAt(new Date().toLocaleTimeString("zh-TW", { hour12: false }));
+      }
+    } catch {}
+    setLoading(false);
+  };
 
-function HistoryTable({ items }: { items: HistoryItem[] }) {
+  useEffect(() => {
+    fetchPrices();
+    const interval = setInterval(fetchPrices, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const cryptos = assets.filter((a) => a.type === "crypto");
+  const futures = assets.filter((a) => a.type === "futures");
+
   return (
-    <div className="space-y-3">
-      {items.map((item) => (
-        <div
-          key={item.id}
-          className="flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            <div className={`w-2 h-2 rounded-full ${item.status === "profit" ? "bg-green-400" : "bg-red-400"}`} />
-            <div>
-              <p className="text-sm font-medium">{item.name}</p>
-              <p className="text-xs text-gray-500">{item.symbol} · {item.strategy} · {item.date}</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className={`text-sm font-bold ${item.status === "profit" ? "text-green-400" : "text-red-400"}`}>
-              {item.returnPct > 0 ? "+" : ""}{item.returnPct}%
-            </p>
-            <p className="text-xs text-gray-500">勝率 {item.winRate}%</p>
-          </div>
+    <div className="p-8">
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">市場即時報價</h1>
+          <p className="text-slate-400 mt-1">
+            加密貨幣即時更新 · 期貨延遲約 15 分鐘
+            {updatedAt && <span className="ml-2 text-slate-500">· 更新於 {updatedAt}</span>}
+          </p>
         </div>
-      ))}
+        <button
+          onClick={fetchPrices}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 glass-card text-slate-300 hover:text-white text-sm transition-all"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          刷新
+        </button>
+      </div>
+
+      {/* Crypto Section */}
+      <div className="mb-8">
+        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">加密貨幣</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {cryptos.map((asset) => (
+            <Link
+              key={asset.symbol}
+              href={`/dashboard/backtest?symbol=${encodeURIComponent(asset.symbol)}`}
+              className="glass-card p-5 hover:border-indigo-500/40 hover:glow-purple transition-all group cursor-pointer"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <div className="font-mono font-bold text-white">{asset.symbol}</div>
+                  <div className="text-slate-400 text-xs mt-0.5">{asset.name}</div>
+                </div>
+                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${asset.change >= 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
+                  {asset.change >= 0 ? "+" : ""}{asset.change.toFixed(2)}%
+                </span>
+              </div>
+              <div className="font-mono font-bold text-white text-xl">
+                ${asset.price.toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className={`flex items-center gap-1 mt-2 text-xs ${asset.change >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {asset.change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                24h 變動
+              </div>
+              <div className="mt-3 flex items-center gap-1 text-indigo-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                <Zap className="w-3 h-3" /> 點擊開始回測
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Futures Section */}
+      <div>
+        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+          期貨市場 <span className="text-slate-600 normal-case tracking-normal font-normal">（延遲報價）</span>
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {futures.map((asset) => (
+            <div key={asset.symbol} className="glass-card p-5">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <div className="font-mono font-bold text-white">{asset.symbol}</div>
+                  <div className="text-slate-400 text-xs mt-0.5">{asset.name}</div>
+                </div>
+                <span className="text-[10px] badge-purple">延遲</span>
+              </div>
+              <div className="font-mono font-bold text-white text-xl">
+                ${asset.price.toLocaleString()}
+              </div>
+              <div className={`flex items-center gap-1 mt-2 text-xs ${asset.change >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {asset.change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                {asset.change >= 0 ? "+" : ""}{asset.change.toFixed(2)}%
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="mt-10 glass-card p-6">
+        <h2 className="text-white font-bold mb-4">快速操作</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Link href="/dashboard/backtest" className="flex items-center gap-3 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 hover:border-indigo-500/40 transition-all group">
+            <div className="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+              <Zap className="w-5 h-5 text-indigo-400" />
+            </div>
+            <div className="flex-1">
+              <div className="text-white font-medium text-sm">開始回測</div>
+              <div className="text-slate-400 text-xs">設定標的與策略參數</div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 transition-colors" />
+          </Link>
+          <button
+            onClick={() => {}}
+            className="flex items-center gap-3 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-all group text-left"
+          >
+            <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-purple-400" />
+            </div>
+            <div className="flex-1">
+              <div className="text-white font-medium text-sm">績效分析</div>
+              <div className="text-slate-400 text-xs">查看回測結果排行</div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-purple-400 transition-colors" />
+          </button>
+          <button
+            onClick={() => {}}
+            className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 hover:border-emerald-500/40 transition-all group text-left"
+          >
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+              <History className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <div className="text-white font-medium text-sm">歷史記錄</div>
+              <div className="text-slate-400 text-xs">查看過往回測紀錄</div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState<"overview" | "history">("overview");
+  const [activeTab, setActiveTab] = useState("market");
+  const [selectedResult, setSelectedResult] = useState<number | null>(null);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white flex">
-      <aside className="w-64 bg-[#0f0f1a] border-r border-white/10 flex flex-col">
-        <div className="p-6 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-              <BarChart3 className="w-4 h-4 text-white" />
+    <div className="flex h-screen gradient-bg overflow-hidden">
+      {/* Sidebar */}
+      <aside className="w-64 flex-shrink-0 glass border-r border-indigo-500/10 flex flex-col">
+        <div className="p-6 border-b border-indigo-500/10">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-lg">BacktestNow</span>
-          </div>
+            <span className="font-bold text-white text-lg">BacktestNow</span>
+          </Link>
+          <p className="text-slate-500 text-xs mt-1">AI 策略回測優化平台</p>
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
-          <button
-            onClick={() => setActiveTab("overview")}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-              activeTab === "overview"
-                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                : "text-gray-400 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <LayoutDashboard className="w-5 h-5" />
-            總覽
-          </button>
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                activeTab === item.id
+                  ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
           <Link
             href="/dashboard/backtest"
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all"
           >
             <Zap className="w-5 h-5" />
-            新增回測
+            回測設定
           </Link>
-          <button
-            onClick={() => setActiveTab("history")}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-              activeTab === "history"
-                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                : "text-gray-400 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <History className="w-5 h-5" />
-            歷史記錄
-          </button>
-          <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all">
-            <Settings className="w-5 h-5" />
-            設定
-          </button>
         </nav>
 
-        <div className="p-4 border-t border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-              <User className="w-4 h-4 text-white" />
+        <div className="p-4 border-t border-indigo-500/10">
+          <div className="flex items-center gap-3 px-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+              U
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">使用者</p>
-              <p className="text-xs text-gray-500 truncate">backtestnow</p>
+            <div className="text-sm">
+              <p className="text-white font-medium">我的帳號</p>
+              <p className="text-slate-500 text-xs">免費方案</p>
             </div>
           </div>
         </div>
       </aside>
 
+      {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <header className="p-6 border-b border-white/10 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">
-              {activeTab === "overview" ? "儀表板總覽" : "回測歷史記錄"}
-            </h1>
-            <p className="text-gray-500 text-sm mt-1">
-              {new Date().toLocaleDateString("zh-TW", {
-                year: "numeric", month: "long", day: "numeric", weekday: "long"
-              })}
-            </p>
+        {activeTab === "market" && <MarketOverview />}
+
+        {activeTab === "optimize" && (
+          <div className="p-8">
+            <div className="mb-8">
+              <h1 className="text-2xl font-bold text-white">新增策略優化</h1>
+              <p className="text-slate-400 mt-1">貼上您的 PineScript 代碼，AI 將自動分析並優化參數</p>
+            </div>
+            <OptimizePanel />
           </div>
-          <Link
-            href="/dashboard/backtest"
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Zap className="w-4 h-4" />
-            開始回測
-          </Link>
-        </header>
+        )}
 
-        <div className="p-6 space-y-6">
-          {activeTab === "overview" && (
-            <>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {STATS.map((stat, i) => {
-                  const Icon = stat.icon;
-                  return (
-                    <div key={i} className="bg-[#0f0f1a] border border-white/10 rounded-xl p-4">
-                      <div className={`${stat.color} mb-3`}><Icon className="w-5 h-5" /></div>
-                      <p className="text-2xl font-bold">{stat.value}</p>
-                      <p className="text-gray-500 text-sm mt-1">{stat.label}</p>
-                    </div>
-                  );
-                })}
+        {activeTab === "history" && (
+          <div className="p-8">
+            <div className="mb-8 flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-white">優化歷史記錄</h1>
+                <p className="text-slate-400 mt-1">查看過去的回測與優化結果</p>
               </div>
+              <button onClick={() => setActiveTab("optimize")} className="btn-primary flex items-center gap-2 text-sm py-2">
+                <PlusCircle className="w-4 h-4" /> 新增優化
+              </button>
+            </div>
+            <div className="glass-card overflow-hidden">
+              <table className="w-full data-table">
+                <thead>
+                  <tr>
+                    <th className="text-left">策略名稱</th>
+                    <th className="text-left">交易對</th>
+                    <th className="text-left">時間框架</th>
+                    <th className="text-left">狀態</th>
+                    <th className="text-right">Sharpe Ratio</th>
+                    <th className="text-right">勝率</th>
+                    <th className="text-right">總獲利 %</th>
+                    <th className="text-left">日期</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {MOCK_HISTORY.map((row) => (
+                    <tr key={row.id}>
+                      <td className="font-medium text-white">{row.name}</td>
+                      <td className="font-mono text-slate-300">{row.symbol}</td>
+                      <td className="text-slate-400">{row.timeframe}</td>
+                      <td>
+                        {row.status === "completed" ? (
+                          <span className="badge-green">完成</span>
+                        ) : (
+                          <span className="badge-purple flex items-center gap-1 w-fit">
+                            <Activity className="w-3 h-3 animate-pulse" /> 執行中
+                          </span>
+                        )}
+                      </td>
+                      <td className="text-right font-mono text-white">
+                        {row.sharpe ?? <span className="text-slate-500">-</span>}
+                      </td>
+                      <td className="text-right">
+                        {row.winrate ? (
+                          <span className="text-emerald-400 font-mono">{row.winrate}%</span>
+                        ) : <span className="text-slate-500">-</span>}
+                      </td>
+                      <td className="text-right">
+                        {row.profit ? (
+                          <span className={`font-mono font-bold ${row.profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {row.profit >= 0 ? "+" : ""}{row.profit}%
+                          </span>
+                        ) : <span className="text-slate-500">-</span>}
+                      </td>
+                      <td className="text-slate-500 text-xs">{row.date}</td>
+                      <td>
+                        {row.status === "completed" && (
+                          <button
+                            onClick={() => { setSelectedResult(row.id); setActiveTab("analytics"); }}
+                            className="text-indigo-400 hover:text-indigo-300 text-xs font-medium"
+                          >
+                            查看詳情
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
-              <div className="bg-[#0f0f1a] border border-white/10 rounded-xl p-5">
-                <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-blue-400" />
-                  即時市場報價
-                </h2>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  {MARKET_DATA.map((m, i) => (
-                    <div key={i} className="bg-white/5 rounded-lg p-3">
-                      <p className="text-gray-400 text-xs mb-1">{m.symbol}</p>
-                      <p className="font-bold">${m.price}</p>
-                      <p className={`text-sm flex items-center gap-1 mt-1 ${m.positive ? "text-green-400" : "text-red-400"}`}>
-                        {m.positive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                        {m.change}
-                      </p>
+        {activeTab === "analytics" && (
+          <div className="p-8">
+            <div className="mb-8">
+              <h1 className="text-2xl font-bold text-white">績效分析</h1>
+              <p className="text-slate-400 mt-1">深度分析回測結果與最佳參數組合</p>
+            </div>
+            <ResultsPanel resultId={selectedResult} />
+          </div>
+        )}
+
+        {activeTab === "settings" && (
+          <div className="p-8">
+            <div className="mb-8">
+              <h1 className="text-2xl font-bold text-white">設定</h1>
+              <p className="text-slate-400 mt-1">管理您的帳號與 API 設定</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="glass-card p-6">
+                <h3 className="font-bold text-white mb-4">API 金鑰設定</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-slate-400 text-sm mb-1 block">Binance API Key</label>
+                    <input type="password" className="input-dark" placeholder="輸入您的 Binance API Key" />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 text-sm mb-1 block">Binance Secret Key</label>
+                    <input type="password" className="input-dark" placeholder="輸入您的 Secret Key" />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 text-sm mb-1 block">OpenAI API Key</label>
+                    <input type="password" className="input-dark" placeholder="輸入您的 OpenAI API Key" />
+                  </div>
+                  <button className="btn-primary w-full">儲存設定</button>
+                </div>
+              </div>
+              <div className="glass-card p-6">
+                <h3 className="font-bold text-white mb-4">使用量統計</h3>
+                <div className="space-y-4">
+                  {[
+                    { label: "本月回測次數", value: "3 / 10", pct: 30 },
+                    { label: "API 呼叫次數", value: "127 / 500", pct: 25 },
+                    { label: "儲存空間", value: "2.3 MB / 100 MB", pct: 2 },
+                  ].map((stat) => (
+                    <div key={stat.label}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-slate-400">{stat.label}</span>
+                        <span className="text-white font-mono">{stat.value}</span>
+                      </div>
+                      <div className="progress-bar">
+                        <div className="progress-fill" style={{ width: `${stat.pct}%` }} />
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
-
-              <div className="bg-[#0f0f1a] border border-white/10 rounded-xl p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-semibold flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-purple-400" />
-                    最近回測
-                  </h2>
-                  <button
-                    onClick={() => setActiveTab("history")}
-                    className="text-xs text-gray-500 hover:text-white flex items-center gap-1 transition-colors"
-                  >
-                    查看全部 <ChevronRight className="w-3 h-3" />
-                  </button>
-                </div>
-                <HistoryTable items={MOCK_HISTORY.slice(0, 3)} />
-              </div>
-            </>
-          )}
-
-          {activeTab === "history" && (
-            <div className="bg-[#0f0f1a] border border-white/10 rounded-xl p-5">
-              <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
-                <History className="w-4 h-4 text-purple-400" />
-                所有回測記錄
-              </h2>
-              <HistoryTable items={MOCK_HISTORY} />
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </main>
     </div>
   );
