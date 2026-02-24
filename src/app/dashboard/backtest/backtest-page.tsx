@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import {
   BarChart3, ArrowLeft, Play, Settings2, Clock, Calendar,
   TrendingUp, ChevronDown, AlertCircle, CheckCircle2, Loader2,
-  Target, DollarSign, Percent, Activity
+  Target, DollarSign, Percent, Activity, Code2, ChevronUp
 } from "lucide-react";
 
 const SYMBOLS = [
@@ -97,6 +97,7 @@ type BacktestResult = {
 function BacktestPageInner() {
   const searchParams = useSearchParams();
   const urlSymbol = searchParams.get("symbol");
+
   const defaultSymbol = urlSymbol
     ? SYMBOLS.find((s) => s.label === urlSymbol)?.value ?? "BTCUSDT"
     : "BTCUSDT";
@@ -109,6 +110,8 @@ function BacktestPageInner() {
   const [commission, setCommission] = useState(0.1);
   const [selectedStrategy, setSelectedStrategy] = useState(STRATEGY_TEMPLATES[0]);
   const [paramValues, setParamValues] = useState<Record<string, number | string>>({});
+  const [pineScript, setPineScript] = useState("");
+  const [pineScriptOpen, setPineScriptOpen] = useState(true);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [error, setError] = useState("");
@@ -144,6 +147,7 @@ function BacktestPageInner() {
           initialCapital, commission,
           strategy: selectedStrategy.id,
           params: paramValues,
+          pineScript: pineScript || undefined,
         }),
       });
 
@@ -303,6 +307,62 @@ function BacktestPageInner() {
 
           {/* Right: Strategy + Results */}
           <div className="lg:col-span-2 space-y-6">
+
+            {/* Pine Script Input */}
+            <div className="glass-card p-6">
+              <button
+                onClick={() => setPineScriptOpen((o) => !o)}
+                className="w-full flex items-center justify-between mb-0"
+              >
+                <h2 className="text-white font-bold flex items-center gap-2">
+                  <Code2 className="w-4 h-4 text-purple-400" /> Pine Script 策略代碼
+                  <span className="text-xs font-normal text-slate-500 ml-2">（可選）貼上你的 TradingView 策略</span>
+                </h2>
+                {pineScriptOpen
+                  ? <ChevronUp className="w-4 h-4 text-slate-400" />
+                  : <ChevronDown className="w-4 h-4 text-slate-400" />}
+              </button>
+
+              {pineScriptOpen && (
+                <div className="mt-4 space-y-3">
+                  <textarea
+                    value={pineScript}
+                    onChange={(e) => setPineScript(e.target.value)}
+                    placeholder={`//@version=5
+strategy("My Strategy", overlay=true)
+
+// 輸入參數
+rsiLength = input.int(14, "RSI Length", minval=5, maxval=50)
+overbought = input.int(70, "Overbought", minval=60, maxval=90)
+oversold   = input.int(30, "Oversold",   minval=10, maxval=40)
+
+// 指標
+rsi = ta.rsi(close, rsiLength)
+
+// 進出場
+if rsi < oversold
+    strategy.entry("Long", strategy.long)
+if rsi > overbought
+    strategy.close("Long")`}
+                    className="w-full h-48 bg-black/30 border border-indigo-500/20 rounded-xl p-4 text-sm font-mono text-slate-300 placeholder-slate-600 resize-y focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+                    spellCheck={false}
+                  />
+                  <div className="flex items-center justify-between">
+                    <p className="text-slate-500 text-xs">
+                      貼上 Pine Script 代碼後，系統將依下方參數設定執行回測
+                    </p>
+                    {pineScript && (
+                      <button
+                        onClick={() => setPineScript("")}
+                        className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+                      >
+                        清除
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Strategy Selection */}
             <div className="glass-card p-6">
