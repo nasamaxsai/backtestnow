@@ -126,10 +126,7 @@ export default function HomePage() {
             <span className="font-bold text-white text-lg">BacktestNow</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/sign-in" className="text-slate-400 hover:text-white transition-colors text-sm font-medium">
-              登入
-            </Link>
-            <Link href="/sign-up" className="btn-primary text-sm py-2 px-5">
+            <Link href="/dashboard" className="btn-primary text-sm py-2 px-5">
               免費開始
             </Link>
           </div>
@@ -152,11 +149,11 @@ export default function HomePage() {
             助您在多變市場中精準點擊，奪得交易先機。
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/sign-up" className="btn-primary text-base py-3 px-8 flex items-center gap-2 justify-center">
+            <Link href="/dashboard" className="btn-primary text-base py-3 px-8 flex items-center gap-2 justify-center">
               立即啟動優化 <ArrowRight className="w-4 h-4" />
             </Link>
-            <Link href="/sign-in" className="btn-secondary text-base py-3 px-8 justify-center">
-              登入
+            <Link href="/dashboard" className="btn-secondary text-base py-3 px-8 justify-center">
+              進入儀表板
             </Link>
           </div>
         </div>
@@ -214,8 +211,8 @@ export default function HomePage() {
           <div className="text-4xl mb-4">🚀</div>
           <h2 className="text-3xl font-bold text-white mb-4">立即開始免費優化</h2>
           <p className="text-slate-400 mb-8">無需信用卡，立即體驗 AI 策略優化引擎</p>
-          <Link href="/sign-up" className="btn-primary text-base py-3 px-10 inline-flex items-center gap-2">
-            免費建立帳號 <ArrowRight className="w-4 h-4" />
+          <Link href="/dashboard" className="btn-primary text-base py-3 px-10 inline-flex items-center gap-2">
+            立即進入 <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
