@@ -1,25 +1,35 @@
 "use client";
 import { useState } from "react";
-import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import {
   BarChart3, Zap, History, Settings, PlusCircle,
-  TrendingUp, TrendingDown, Activity, Target, Clock
+  TrendingUp, TrendingDown, Activity, Target,
+  LayoutDashboard, User
 } from "lucide-react";
 import OptimizePanel from "@/components/OptimizePanel";
 import ResultsPanel from "@/components/ResultsPanel";
 
 const NAV_ITEMS = [
-  { icon: <Zap className="w-5 h-5" />, label: "新增優化", id: "optimize" },
+  { icon: <Zap className="w-5 h-5" />, label: "快速優化", id: "optimize" },
   { icon: <History className="w-5 h-5" />, label: "歷史記錄", id: "history" },
   { icon: <BarChart3 className="w-5 h-5" />, label: "績效分析", id: "analytics" },
   { icon: <Settings className="w-5 h-5" />, label: "設定", id: "settings" },
 ];
 
-const MOCK_HISTORY = [
+const MOCK_HISTORY: {
+  id: number;
+  name: string;
+  symbol: string;
+  timeframe: string;
+  status: string;
+  sharpe: number | null;
+  winrate: number | null;
+  profit: number | null;
+  date: string;
+}[] = [
   { id: 1, name: "BTC RSI 策略", symbol: "BTC/USDT", timeframe: "4h", status: "completed", sharpe: 2.34, winrate: 67.3, profit: 142.5, date: "2026-02-20" },
-  { id: 2, name: "ETH 布林通道", symbol: "ETH/USDT", timeframe: "1h", status: "completed", sharpe: 1.87, winrate: 61.2, profit: 89.3, date: "2026-02-18" },
-  { id: 3, name: "SOL 突破策略", symbol: "SOL/USDT", timeframe: "15m", status: "running", sharpe: null, winrate: null, profit: null, date: "2026-02-23" },
+  { id: 2, name: "ETH 均線策略", symbol: "ETH/USDT", timeframe: "1h", status: "completed", sharpe: 1.87, winrate: 61.2, profit: 89.3, date: "2026-02-18" },
+  { id: 3, name: "SOL 動量策略", symbol: "SOL/USDT", timeframe: "15m", status: "running", sharpe: null, winrate: null, profit: null, date: "2026-02-23" },
 ];
 
 export default function DashboardPage() {
@@ -37,7 +47,7 @@ export default function DashboardPage() {
             </div>
             <span className="font-bold text-white text-lg">BacktestNow</span>
           </Link>
-          <p className="text-slate-500 text-xs mt-1">AI 策略回測優化平台</p>
+          <p className="text-slate-500 text-xs mt-1">AI 策略優化平台</p>
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
@@ -58,162 +68,177 @@ export default function DashboardPage() {
         </nav>
 
         <div className="p-4 border-t border-indigo-500/10">
-          <div className="flex items-center gap-3">
-            <UserButton afterSignOutUrl="/" />
+          <div className="flex items-center gap-3 px-2 py-2">
+            <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
+              <User className="w-4 h-4 text-indigo-400" />
+            </div>
             <div className="text-sm">
-              <p className="text-white font-medium">我的帳號</p>
-              <p className="text-slate-500 text-xs">免費方案</p>
+              <p className="text-white font-medium">我的帳戶</p>
+              <p className="text-slate-500 text-xs">Pro 方案</p>
             </div>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        {activeTab === "optimize" && (
-          <div className="p-8">
-            <div className="mb-8">
-              <h1 className="text-2xl font-bold text-white">新增策略優化</h1>
-              <p className="text-slate-400 mt-1">貼上您的 PineScript 代碼，AI 將自動分析並優化參數</p>
-            </div>
-            <OptimizePanel />
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <header className="glass border-b border-indigo-500/10 px-8 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-white">
+              {NAV_ITEMS.find((i) => i.id === activeTab)?.label}
+            </h1>
+            <p className="text-slate-500 text-sm">BacktestNow AI 量化平台</p>
           </div>
-        )}
-
-        {activeTab === "history" && (
-          <div className="p-8">
-            <div className="mb-8 flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-white">優化歷史記錄</h1>
-                <p className="text-slate-400 mt-1">查看過去的回測與優化結果</p>
-              </div>
-              <button onClick={() => setActiveTab("optimize")} className="btn-primary flex items-center gap-2 text-sm py-2">
-                <PlusCircle className="w-4 h-4" /> 新增優化
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/backtest">
+              <button className="flex items-center gap-2 px-4 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 rounded-xl text-indigo-300 text-sm font-medium transition-all">
+                <PlusCircle className="w-4 h-4" />
+                新增回測
               </button>
-            </div>
-
-            <div className="glass-card overflow-hidden">
-              <table className="w-full data-table">
-                <thead>
-                  <tr>
-                    <th className="text-left">策略名稱</th>
-                    <th className="text-left">交易對</th>
-                    <th className="text-left">時間框架</th>
-                    <th className="text-left">狀態</th>
-                    <th className="text-right">Sharpe Ratio</th>
-                    <th className="text-right">勝率</th>
-                    <th className="text-right">總獲利 %</th>
-                    <th className="text-left">日期</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {MOCK_HISTORY.map((row) => (
-                    <tr key={row.id}>
-                      <td className="font-medium text-white">{row.name}</td>
-                      <td className="font-mono text-slate-300">{row.symbol}</td>
-                      <td className="text-slate-400">{row.timeframe}</td>
-                      <td>
-                        {row.status === "completed" ? (
-                          <span className="badge-green">完成</span>
-                        ) : (
-                          <span className="badge-purple flex items-center gap-1 w-fit">
-                            <Activity className="w-3 h-3 animate-pulse" /> 執行中
-                          </span>
-                        )}
-                      </td>
-                      <td className="text-right font-mono text-white">
-                        {row.sharpe ?? <span className="text-slate-500">-</span>}
-                      </td>
-                      <td className="text-right">
-                        {row.winrate ? (
-                          <span className="text-emerald-400 font-mono">{row.winrate}%</span>
-                        ) : <span className="text-slate-500">-</span>}
-                      </td>
-                      <td className="text-right">
-                        {row.profit ? (
-                          <span className={`font-mono font-bold ${row.profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                            {row.profit >= 0 ? "+" : ""}{row.profit}%
-                          </span>
-                        ) : <span className="text-slate-500">-</span>}
-                      </td>
-                      <td className="text-slate-500 text-xs">{row.date}</td>
-                      <td>
-                        {row.status === "completed" && (
-                          <button
-                            onClick={() => { setSelectedResult(row.id); setActiveTab("analytics"); }}
-                            className="text-indigo-400 hover:text-indigo-300 text-xs font-medium"
-                          >
-                            查看詳情
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            </Link>
           </div>
-        )}
+        </header>
 
-        {activeTab === "analytics" && (
-          <div className="p-8">
-            <div className="mb-8">
-              <h1 className="text-2xl font-bold text-white">績效分析</h1>
-              <p className="text-slate-400 mt-1">深度分析回測結果與最佳參數組合</p>
+        <div className="flex-1 overflow-auto p-8">
+          {activeTab === "optimize" && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <OptimizePanel />
+              <ResultsPanel
+                selectedResult={selectedResult}
+                onSelectResult={setSelectedResult}
+              />
             </div>
-            <ResultsPanel resultId={selectedResult} />
-          </div>
-        )}
+          )}
 
-        {activeTab === "settings" && (
-          <div className="p-8">
-            <div className="mb-8">
-              <h1 className="text-2xl font-bold text-white">設定</h1>
-              <p className="text-slate-400 mt-1">管理您的帳號與 API 設定</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="glass-card p-6">
-                <h3 className="font-bold text-white mb-4">API 金鑰設定</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-slate-400 text-sm mb-1 block">Binance API Key</label>
-                    <input type="password" className="input-dark" placeholder="輸入您的 Binance API Key" />
-                  </div>
-                  <div>
-                    <label className="text-slate-400 text-sm mb-1 block">Binance Secret Key</label>
-                    <input type="password" className="input-dark" placeholder="輸入您的 Secret Key" />
-                  </div>
-                  <div>
-                    <label className="text-slate-400 text-sm mb-1 block">OpenAI API Key</label>
-                    <input type="password" className="input-dark" placeholder="輸入您的 OpenAI API Key" />
-                  </div>
-                  <button className="btn-primary w-full">儲存設定</button>
-                </div>
+          {activeTab === "history" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">歷史回測記錄</h2>
+                <span className="text-slate-500 text-sm">{MOCK_HISTORY.length} 筆記錄</span>
               </div>
-              <div className="glass-card p-6">
-                <h3 className="font-bold text-white mb-4">使用量統計</h3>
-                <div className="space-y-4">
-                  {[
-                    { label: "本月回測次數", value: "3 / 10", pct: 30 },
-                    { label: "API 呼叫次數", value: "127 / 500", pct: 25 },
-                    { label: "儲存空間", value: "2.3 MB / 100 MB", pct: 2 },
-                  ].map((stat) => (
-                    <div key={stat.label}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-slate-400">{stat.label}</span>
-                        <span className="text-white font-mono">{stat.value}</span>
-                      </div>
-                      <div className="progress-bar">
-                        <div className="progress-fill" style={{ width: `${stat.pct}%` }} />
+              {MOCK_HISTORY.map((run) => (
+                <div
+                  key={run.id}
+                  className="glass rounded-2xl p-5 border border-indigo-500/10 hover:border-indigo-500/30 transition-all"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          run.status === "completed"
+                            ? "bg-emerald-400"
+                            : "bg-yellow-400 animate-pulse"
+                        }`}
+                      />
+                      <div>
+                        <p className="text-white font-medium">{run.name}</p>
+                        <p className="text-slate-500 text-sm">
+                          {run.symbol} · {run.timeframe} · {run.date}
+                        </p>
                       </div>
                     </div>
-                  ))}
+                    {run.status === "completed" && (
+                      <div className="flex items-center gap-6 text-sm">
+                        <div className="text-center">
+                          <p className="text-slate-500">Sharpe</p>
+                          <p className="text-white font-semibold">{run.sharpe}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-slate-500">勝率</p>
+                          <p className="text-emerald-400 font-semibold">{run.winrate}%</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-slate-500">獲利</p>
+                          <p
+                            className={`font-semibold ${
+                              (run.profit ?? 0) > 0 ? "text-emerald-400" : "text-red-400"
+                            }`}
+                          >
+                            {(run.profit ?? 0) > 0 ? "+" : ""}
+                            {run.profit}%
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {run.status === "running" && (
+                      <span className="text-yellow-400 text-sm flex items-center gap-1">
+                        <Activity className="w-4 h-4" /> 執行中...
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab === "analytics" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                {
+                  label: "總回測次數",
+                  value: "3",
+                  icon: <Target className="w-5 h-5" />,
+                  color: "indigo",
+                },
+                {
+                  label: "平均勝率",
+                  value: "64.3%",
+                  icon: <TrendingUp className="w-5 h-5" />,
+                  color: "emerald",
+                },
+                {
+                  label: "最佳 Sharpe",
+                  value: "2.34",
+                  icon: <Activity className="w-5 h-5" />,
+                  color: "purple",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="glass rounded-2xl p-6 border border-indigo-500/10"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div
+                      className={`w-10 h-10 rounded-xl bg-${stat.color}-500/20 flex items-center justify-center text-${stat.color}-400`}
+                    >
+                      {stat.icon}
+                    </div>
+                    <p className="text-slate-400 text-sm">{stat.label}</p>
+                  </div>
+                  <p className="text-3xl font-bold text-white">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab === "settings" && (
+            <div className="glass rounded-2xl p-8 border border-indigo-500/10 max-w-lg">
+              <h2 className="text-lg font-semibold text-white mb-6">帳戶設定</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-slate-400 text-sm">預設交易所</label>
+                  <div className="mt-1 bg-white/5 rounded-xl px-4 py-3 text-white border border-white/10">
+                    Binance
+                  </div>
+                </div>
+                <div>
+                  <label className="text-slate-400 text-sm">API 金鑰狀態</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="text-emerald-400 text-sm">已連接</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-slate-400 text-sm">方案</label>
+                  <div className="mt-1 bg-white/5 rounded-xl px-4 py-3 text-white border border-white/10 flex items-center justify-between">
+                    <span>Pro 方案</span>
+                    <span className="text-indigo-400 text-sm">升級</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </main>
     </div>
   );
